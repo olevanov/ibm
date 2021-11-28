@@ -1,9 +1,15 @@
 package ibm.cleaner;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Scanner;
+import java.util.Set;
 
+/**
+ * Vacuum cleaner simulator
+ * 
+ * @author Anton Aliavanau
+ *
+ */
 public class VacuumCleaner {
 
     public static void main(String[] args) {
@@ -11,50 +17,53 @@ public class VacuumCleaner {
         int x = input.nextInt();
         int y = input.nextInt();
         input.nextLine();
-        int[][] floor = new int[x][y];
 
         Floor floorObj = new Floor(x, y);
 
         while(input.hasNextLine()) {
-            String[] initState = input.nextLine().split(" ");
+            String state = input.nextLine();
             String commands = input.nextLine();
-
-            Cleaner cleaner = new Cleaner(floorObj, Integer.valueOf(initState[1]), Integer.valueOf(initState[2]), DirectionsEnum.valueOf(initState[0]));
-
+            if(state.length() == 0 || commands.length() == 0) {
+              break;
+            }
+            String[] initState = state.split(" ");
+            
+            Cleaner cleaner = new Cleaner(floorObj, initState);
+            StringBuilder repeatCountStr = new StringBuilder();
             for (int i = 0; i < commands.length(); i++) {
                 char element = commands.charAt(i);
-
                 if (Character.isDigit(element)) {
-                    int repeatCount = 0;
-                    String repeatStr = Character.toString(element);
-                    char element1 = commands.charAt(++i);
-                    if (Character.isDigit(element1)) {
-                        repeatStr += Character.toString(element1);
-                        ++i;
-                    }
-
-                    repeatCount = Integer.valueOf(repeatStr);
-                    String actionType = Character.toString(commands.charAt(i));
-                    for (int j = 0; j < repeatCount; j++) {
-                        cleaner.changeCleanerLocation(Actions.valueOf(actionType));
-                    }
+                  repeatCountStr.append(element);
+                  continue;
                 } else {
-                    cleaner.changeCleanerLocation(Actions.valueOf(Character.toString(element)));
+                    String actionElement = Character.toString(element);
+                    int repeatCount = repeatCountStr.length() > 0 ? Integer.valueOf(repeatCountStr.toString()):1;
+                    repeatCountStr = new StringBuilder();
+                    for (int j = 0; j < repeatCount; j++) {
+                        cleaner.changeCleanerLocation(Action.valueOf(actionElement));
+                    }
                 }
             }
-            floorObj.addToBlockedList(new Coordinate(cleaner.getPositionX(), cleaner.getPositionY()));
-            System.out.println(cleaner.getPositionX() + " " + cleaner.getPositionY() + " " + cleaner.getDirection().name());
+            floorObj.addToBlockedList(new Location(cleaner.getPositionX(), cleaner.getPositionY()));
+            System.out.println(cleaner.toString());
         }
+        input.close();
     }
 }
 
-enum DirectionsEnum {
+/**
+ * Directions that cleaner can move
+ * 
+ * @author Anton Aliavanau
+ *
+ */
+enum Direction {
 
     N(0), E(1), S(2), W(3);
 
     private int pos;
 
-    DirectionsEnum(int pos) {
+    Direction(int pos) {
         this.pos = pos;
     }
 
@@ -64,30 +73,74 @@ enum DirectionsEnum {
 
 }
 
-enum Actions {
+/**
+ * Possible action R - turn right, L - turn left, F - move forward 
+ * 
+ * @author Anton Aliavanau
+ *
+ */
+enum Action {
     R, L, F;
 }
 
-class Coordinate {
+/**
+ * Stores coordinate
+ * 
+ * @author Anton Aliavanau
+ *
+ */
+class Location {
     private final int xCount;
     private final int yCount;
 
-    public Coordinate(int xCount, int yCount) {
+    public Location(int xCount, int yCount) {
         this.xCount = xCount;
         this.yCount = yCount;
     }
 
-    public boolean blocked(int x, int y) {
+    public boolean isTaken(int x, int y) {
         return this.xCount == x && this.yCount == y;
     }
+
+    @Override
+    public int hashCode() {
+      final int prime = 31;
+      int result = 1;
+      result = prime * result + xCount;
+      result = prime * result + yCount;
+      return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj)
+        return true;
+      if (obj == null)
+        return false;
+      if (getClass() != obj.getClass())
+        return false;
+      Location other = (Location) obj;
+      if (xCount != other.xCount)
+        return false;
+      if (yCount != other.yCount)
+        return false;
+      return true;
+    }
+    
 }
 
+/**
+ * Represent floor
+ * 
+ * @author Anton Aliavanau
+ *
+ */
 class Floor {
 
     private final int xCount;
     private final int yCount;
 
-    public List<Coordinate> blockedCoordinateList = new ArrayList<>();
+    private Set<Location> blockedLocations = new HashSet<Location>();
 
     public Floor(int xCount, int yCount) {
         this.xCount = xCount;
@@ -102,37 +155,52 @@ class Floor {
         return yCount;
     }
 
-    public List<Coordinate> getBlockedCoordinateList() {
-        return blockedCoordinateList;
+    public Set<Location> getBlockedLocationList() {
+        return blockedLocations;
     }
 
-    public void setBlockedCoordinateList(List<Coordinate> blockedCoordinateList) {
-        this.blockedCoordinateList = blockedCoordinateList;
+    public void setBlockedCoordinateList(Set<Location> blockedLocations) {
+        this.blockedLocations = blockedLocations;
     }
 
-    public void addToBlockedList(Coordinate coordinate) {
-        this.blockedCoordinateList.add(coordinate);
+    public void addToBlockedList(Location coordinate) {
+        this.blockedLocations.add(coordinate);
     }
 
-    public boolean containsBlocked(int x, int y) {
-        for (Coordinate coordinate: blockedCoordinateList) {
-            if (coordinate.blocked(x,y)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
+  public boolean containsTakenLocation(int x, int y) {
+    return blockedLocations.contains(new Location(x, y));
+  }
 
 }
 
+/**
+ * Cleaner
+ * 
+ * @author Anton Aliavanau
+ *
+ */
 class Cleaner {
 
-    public Cleaner(Floor floor, int positionX, int positionY, DirectionsEnum direction) {
-        this.positionX = positionX;
-        this.positionY = positionY;
-        this.direction = direction;
-        this.floor = floor;
+    public Cleaner(Floor floor, String[] initState) {
+      this.floor = floor;
+      initInitialPosition(initState);
+      if (floor.containsTakenLocation(this.positionX, this.positionY)) {
+        throw new IllegalArgumentException("Invalid initial location for cleaner");
+      }
+    }
+
+    private void initInitialPosition(String[] initState) {
+      try {
+        this.positionX = Integer.parseInt(initState[0]);
+        this.positionY = Integer.parseInt(initState[1]);
+        this.direction = Direction.valueOf(initState[2]);
+      }
+      catch (NumberFormatException e) {
+        this.positionX = Integer.parseInt(initState[1]);
+        this.positionY = Integer.parseInt(initState[2]);
+        this.direction = Direction.valueOf(initState[0]);
+      }
+      
     }
 
     public Cleaner() {
@@ -143,7 +211,7 @@ class Cleaner {
 
     Floor floor;
 
-    DirectionsEnum direction;
+    Direction direction;
 
     public int getPositionX() {
         return positionX;
@@ -161,11 +229,11 @@ class Cleaner {
         this.positionY = positionY;
     }
 
-    public DirectionsEnum getDirection() {
+    public Direction getDirection() {
         return direction;
     }
 
-    public void setDirection(DirectionsEnum direction) {
+    public void setDirection(Direction direction) {
         this.direction = direction;
     }
 
@@ -180,20 +248,20 @@ class Cleaner {
     public void move(int xIncr, int yIncr) {
         if (xIncr != 0) {
             this.positionX += xIncr;
-            if (this.positionX > getFloor().getxCount() || this.positionX < 0 || getFloor().containsBlocked(this.positionX, this.positionY)) {
+            if (this.positionX > getFloor().getxCount() || this.positionX < 0 || getFloor().containsTakenLocation(this.positionX, this.positionY)) {
                 this.positionX -= xIncr;
             }
         }
 
         if (yIncr != 0) {
             this.positionY += yIncr;
-            if (this.positionY > getFloor().getyCount() || this.positionY < 0 || getFloor().containsBlocked(this.positionX, this.positionY)) {
+            if (this.positionY > getFloor().getyCount() || this.positionY < 0 || getFloor().containsTakenLocation(this.positionX, this.positionY)) {
                 this.positionY -= yIncr;
             }
         }
     }
 
-    public void changeCleanerLocation(Actions action) {
+    public void changeCleanerLocation(Action action) {
 
         switch (action) {
             case R:
@@ -226,7 +294,7 @@ class Cleaner {
         }
     }
 
-    private DirectionsEnum getDirection(int index) {
+    private Direction getDirection(int index) {
 
         int pos = getDirection().getPos() + index;
         if (pos > 3) {
@@ -235,13 +303,18 @@ class Cleaner {
             pos = 3;
         }
 
-        for (DirectionsEnum dir: DirectionsEnum.values()) {
+        for (Direction dir: Direction.values()) {
             if (dir.getPos() == pos) {
                 return dir;
             }
         }
 
-        return DirectionsEnum.N;
+        return Direction.N;
+    }
+    
+    @Override
+    public String toString() {
+      return positionX + " " + positionY + " " + direction.name();
     }
 }
 
